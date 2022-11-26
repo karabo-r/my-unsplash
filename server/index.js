@@ -45,13 +45,14 @@ app.get("/api/users", async (request, response) => {
 // create user
 app.post("/api/users", async (request, response) => {
 	const { name, username, password } = request.body;
+	const doesUserExist = await Users.find({ username });
 	const newUser = new Users({ name, username, password });
 
-	try {
+	if (doesUserExist.length > 0) {
+		response.json({error: "username found"});
+	} else {
 		const results = await newUser.save();
-		response.json({ data: results });
-	} catch (error) {
-		response.json({ error: error.message });
+		response.json(results);
 	}
 });
 
