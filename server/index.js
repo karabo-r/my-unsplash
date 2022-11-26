@@ -2,6 +2,8 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
+const jwt = require("jsonwebtoken");
+// const { request } = require("express");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -49,10 +51,25 @@ app.post("/api/users", async (request, response) => {
 	const newUser = new Users({ name, username, password });
 
 	if (doesUserExist.length > 0) {
-		response.json({error: "username found"});
+		response.json({ error: "username found" });
 	} else {
 		const results = await newUser.save();
 		response.json(results);
+	}
+});
+
+// login user
+app.post("/api/login", async (request, response) => {
+	const { username, password } = request.body;
+	const doesUserExist = await Users.find({ username });
+
+	if (doesUserExist.length > 0) {
+		const token = jwt.sign({ username }, process.env.SECRET, {
+			expiresIn: 86400, // expires in 24 hours
+		});
+		response.status(200).json({ token });
+	} else {
+		response.json({ error: "please try again" });
 	}
 });
 
