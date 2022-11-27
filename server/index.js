@@ -3,11 +3,13 @@ const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
 const jwt = require("jsonwebtoken");
+const fileUpload = require("express-fileupload");
 // const { request } = require("express");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+app.use(fileUpload());
 app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -25,6 +27,12 @@ const userSchema = new mongoose.Schema({
 	password: { type: String, ...defaultValidation },
 });
 
+// create schema for image
+const imageSchema = new mongoose.Schema({
+	name: String,
+	data: Buffer,
+});
+
 // hide password from returned response
 userSchema.set("toJSON", {
 	transform: (document, returnedObject) => {
@@ -37,6 +45,9 @@ userSchema.set("toJSON", {
 
 // create model from schema
 const Users = mongoose.model("Users", userSchema);
+
+// create model from schema
+const Images = mongoose.model("Images", imageSchema);
 
 // get all users
 app.get("/api/users", async (request, response) => {
@@ -73,4 +84,40 @@ app.post("/api/login", async (request, response) => {
 	}
 });
 
+const extractToken = function (request, response, next) {
+	const authHeader = request.headers.authorization;
+	const token = authHeader.substr(7);
+
+	if (!token) response.json({ error: "token missing" });
+
+	const checkToken = jwt.verify(token, process.env.SECRET);
+
+	if (checkToken) {
+		request.user = checkToken;
+	}else{
+		response.json({error: "invalid token"})
+	}
+
+	next();
+};
+// app.use(extractToken);
+
+// upload image for existing user
+app.post("/api/upload", extractToken, async (request, response) => {
+	const { name, data } = request.files.files;
+	const user = request.user;
+
+	if (user) {
+		try {
+			const newImage = new Images({ name, data });
+			await newImage.save();
+			response.json({ message: "new image saved" });
+		} catch (error) {
+			response.json({ error });
+		}
+	}
+});
+
 app.listen(PORT, () => console.log("Server running on port", PORT));
+
+// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InRlc3QiLCJpYXQiOjE2Njk1MjUyMDcsImV4cCI6MTY2OTYxMTYwN30.xP2QX5xqMPhq3qOCsuxqv00ibbpY0ZUVVqpCGyJzxWM
