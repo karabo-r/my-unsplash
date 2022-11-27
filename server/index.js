@@ -2,9 +2,10 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
+const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const fileUpload = require("express-fileupload");
-// const { request } = require("express");
+
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -59,7 +60,11 @@ app.get("/api/users", async (request, response) => {
 app.post("/api/users", async (request, response) => {
 	const { name, username, password } = request.body;
 	const doesUserExist = await Users.find({ username });
-	const newUser = new Users({ name, username, password });
+
+	const saltRounds = 10;
+	const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+	const newUser = new Users({ name, username, password: hashedPassword });
 
 	if (doesUserExist.length > 0) {
 		response.json({ error: "username found" });
@@ -72,15 +77,27 @@ app.post("/api/users", async (request, response) => {
 // login user
 app.post("/api/login", async (request, response) => {
 	const { username, password } = request.body;
-	const doesUserExist = await Users.find({ username });
+	const doesUserExist = await Users.findOne({ username });
 
-	if (doesUserExist.length > 0) {
-		const token = jwt.sign({ username }, process.env.SECRET, {
-			expiresIn: 86400, // expires in 24 hours
-		});
-		response.status(200).json({ token });
-	} else {
-		response.json({ error: "please try again" });
+	if (doesUserExist) {
+		const verifyHashedPassword = bcrypt.compare(
+			password,
+			doesUserExist.password,
+		);
+		if (verifyHashedPassword) {
+			const token = jwt.sign(
+				{ username, id: doesUserExist._id },
+				process.env.SECRET,
+				{
+					expiresIn: 86400, // expires in 24 hours
+				},
+			);
+			response.status(200).json({ token });
+		} else {
+			response.json({ error: "please try again" });
+		}
+	}else{
+		response.json({error: "you don't exist"})
 	}
 });
 
@@ -94,13 +111,12 @@ const extractToken = function (request, response, next) {
 
 	if (checkToken) {
 		request.user = checkToken;
-	}else{
-		response.json({error: "invalid token"})
+	} else {
+		response.json({ error: "invalid token" });
 	}
 
 	next();
 };
-// app.use(extractToken);
 
 // upload image for existing user
 app.post("/api/upload", extractToken, async (request, response) => {
