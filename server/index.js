@@ -6,7 +6,6 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const fileUpload = require("express-fileupload");
 
-
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -26,6 +25,7 @@ const userSchema = new mongoose.Schema({
 	name: { type: String, ...defaultValidation },
 	username: { type: String, ...defaultValidation },
 	password: { type: String, ...defaultValidation },
+	images: [{ type: mongoose.Types.ObjectId, ref: "Images" }],
 });
 
 // create schema for image
@@ -52,7 +52,7 @@ const Images = mongoose.model("Images", imageSchema);
 
 // get all users
 app.get("/api/users", async (request, response) => {
-	const results = await Users.find({});
+	const results = await Users.find({})
 	response.json({ data: results });
 });
 
@@ -96,8 +96,8 @@ app.post("/api/login", async (request, response) => {
 		} else {
 			response.json({ error: "please try again" });
 		}
-	}else{
-		response.json({error: "you don't exist"})
+	} else {
+		response.json({ error: "you don't exist" });
 	}
 });
 
@@ -123,10 +123,18 @@ app.post("/api/upload", extractToken, async (request, response) => {
 	const { name, data } = request.files.files;
 	const user = request.user;
 
+	// console.log(user);
 	if (user) {
 		try {
 			const newImage = new Images({ name, data });
-			await newImage.save();
+			const savedImage = await newImage.save();
+
+			const updateUser = await Users.findOne({ _id: user.id });
+			updateUser.images.push(savedImage._id);
+			const testResults = await updateUser.save()
+
+			console.log(testResults);
+
 			response.json({ message: "new image saved" });
 		} catch (error) {
 			response.json({ error });
@@ -135,5 +143,3 @@ app.post("/api/upload", extractToken, async (request, response) => {
 });
 
 app.listen(PORT, () => console.log("Server running on port", PORT));
-
-// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InRlc3QiLCJpYXQiOjE2Njk1MjUyMDcsImV4cCI6MTY2OTYxMTYwN30.xP2QX5xqMPhq3qOCsuxqv00ibbpY0ZUVVqpCGyJzxWM
