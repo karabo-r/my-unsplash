@@ -52,7 +52,7 @@ const Images = mongoose.model("Images", imageSchema);
 
 // get all users
 app.get("/api/users", async (request, response) => {
-	const results = await Users.find({})
+	const results = await Users.find({}).populate("images", {id: 1});
 	response.json({ data: results });
 });
 
@@ -131,7 +131,7 @@ app.post("/api/upload", extractToken, async (request, response) => {
 
 			const updateUser = await Users.findOne({ _id: user.id });
 			updateUser.images.push(savedImage._id);
-			const testResults = await updateUser.save()
+			const testResults = await updateUser.save();
 
 			console.log(testResults);
 
@@ -139,6 +139,33 @@ app.post("/api/upload", extractToken, async (request, response) => {
 		} catch (error) {
 			response.json({ error });
 		}
+	}
+});
+
+// delete image for existing user
+app.delete("/api/delete/:id", extractToken, async (request, response) => {
+	const user = request.user;
+	const id = request.params.id;
+	const password = request.body.password;
+
+	const doesUserExist = await Users.findOne({ _id: user.id });
+
+	if (doesUserExist) {
+		const verifyPassword = await bcrypt.compare(
+			password,
+			doesUserExist.password,
+		);
+		if (verifyPassword) {
+			try {
+				await Images.findByIdAndDelete(id).then(() => {
+					response.status(200).json({ message: "image has been deleted" });
+				});
+			} catch (error) {
+				response.json(error);
+			}
+		}
+	} else {
+		response.json({ message: "unauthorized request" });
 	}
 });
 
